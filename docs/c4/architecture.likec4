@@ -1,0 +1,75 @@
+specification {
+  element actor {
+    style { shape person}
+  }
+  element application
+  element service
+  element database {
+    style {shape cylinder }
+  }
+  element queue {
+    style { shape queue}
+  }
+
+  relationship sync
+  relationship async
+}
+
+model {
+  customer = actor "Customer" {
+    description "Browses feed and places orders"
+  }
+  seller = actor "Seller" {
+    description "Manages catalog and receives orders"
+  }
+
+  marketplace = application "Marketplace" {
+    description "Digital platform for sellers and customers"
+
+    gateway  = service "API Gateway / BFF" { technology "HTTP" }
+    auth     = service "Auth Service"      { technology "HTTP" }
+    catalog  = service "Catalog Service"   { technology "HTTP" }
+    feed     = service "Feed Service"      { technology "HTTP" }
+    orders   = service "Order Service"     { technology "HTTP" }
+    payments = service "Payment Service"   { technology "HTTP" }
+    notify   = service "Notification Service" { technology "Worker" }
+
+    authDb     = database "Auth DB"     { technology "PostgreSQL" }
+    catalogDb  = database "Catalog DB"  { technology "PostgreSQL" }
+    feedDb     = database "Feed DB"     { technology "PostgreSQL" }
+    orderDb    = database "Order DB"    { technology "PostgreSQL" }
+    paymentDb  = database "Payment DB"  { technology "PostgreSQL" }
+    notifyDb   = database "Notification DB" { technology "PostgreSQL" }
+
+    broker = queue "Message Broker" { technology "Kafka/RabbitMQ" }
+  }
+
+  customer -[sync]-> marketplace.gateway "Uses web/mobile app"
+  seller   -[sync]-> marketplace.gateway "Uses seller UI"
+
+  marketplace.gateway -[sync]-> marketplace.auth    "Authenticates requests"
+  marketplace.gateway -[sync]-> marketplace.feed    "Requests personalized feed"
+  marketplace.gateway -[sync]-> marketplace.catalog "Browses products"
+  marketplace.gateway -[sync]-> marketplace.orders  "Places orders"
+
+  marketplace.auth     -[sync]-> marketplace.authDb     "R/W"
+  marketplace.catalog  -[sync]-> marketplace.catalogDb  "R/W"
+  marketplace.feed     -[sync]-> marketplace.feedDb     "R/W"
+  marketplace.orders   -[sync]-> marketplace.orderDb    "R/W"
+  marketplace.payments -[sync]-> marketplace.paymentDb  "R/W"
+  marketplace.notify   -[sync]-> marketplace.notifyDb   "R/W"
+
+  marketplace.feed   -[sync]-> marketplace.catalog  "Fetches product details (read-only)"
+  marketplace.orders -[sync]-> marketplace.payments "Initiates payment"
+
+  marketplace.orders   -[async]-> marketplace.broker "Publishes Order events"
+  marketplace.payments -[async]-> marketplace.broker "Publishes Payment events"
+  marketplace.notify   -[async]-> marketplace.broker "Consumes events"
+}
+views {
+  view index {
+    title "Marketplace Container View"
+    include *
+    autoLayout TopBottom
+  }
+}
